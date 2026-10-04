@@ -1,9 +1,10 @@
 // Bump this whenever the shell or runtime changes. The old worker cached the
 // legacy index at `/`, which could keep stale JavaScript alive after deploys.
-const cacheVersion = 'v1.12.0-next';
-const cacheTitle = `pairdrop-cache-${cacheVersion}`;
+const cacheVersion = 'v1.13.0-sharebka';
+const cacheTitle = `sharebka-cache-${cacheVersion}`;
 const relativePathsToCache = [
     'manifest.json',
+    'trx.svg',
     'styles/styles-main.css',
     'styles/styles-deferred.css',
     'scripts/browser-tabs-connector.js',
@@ -30,39 +31,8 @@ const relativePathsToCache = [
     'images/apple-touch-icon.png',
     'fonts/OpenSans/static/OpenSans-Medium.ttf',
     'lang/ar.json',
-    'lang/be.json',
-    'lang/bg.json',
-    'lang/ca.json',
-    'lang/cs.json',
-    'lang/da.json',
-    'lang/de.json',
     'lang/en.json',
-    'lang/es.json',
-    'lang/et.json',
-    'lang/eu.json',
-    'lang/fa.json',
-    'lang/fr.json',
-    'lang/he.json',
-    'lang/hu.json',
-    'lang/id.json',
-    'lang/it.json',
-    'lang/ja.json',
-    'lang/kn.json',
-    'lang/ko.json',
-    'lang/nb.json',
-    'lang/nl.json',
-    'lang/nn.json',
-    'lang/pl.json',
-    'lang/pt-BR.json',
-    'lang/ro.json',
-    'lang/ru.json',
-    'lang/sk.json',
-    'lang/ta.json',
-    'lang/tr.json',
-    'lang/uk.json',
-    'lang/zh-CN.json',
-    'lang/zh-HK.json',
-    'lang/zh-TW.json'
+    'lang/ku.json',
 ];
 const relativePathsNotToCache = [
     '',

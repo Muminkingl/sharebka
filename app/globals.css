@@ -14,3 +14,84 @@ body {
 #pairdrop-root {
   min-height: 100vh;
 }
+
+/* Keep the compact language picker calm and responsive after reducing it to
+   the three supported locales. */
+#language-select-dialog x-background {
+  background: rgba(0, 0, 0, .72);
+  backdrop-filter: blur(8px);
+}
+
+#language-select-dialog x-paper {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity 220ms ease, transform 260ms cubic-bezier(.2, .75, .25, 1);
+}
+
+#language-select-dialog:not([show]) x-paper {
+  opacity: 0;
+  transform: translateY(12px) scale(.97);
+}
+
+#language-select-dialog .language-buttons {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+#language-select-dialog .language-buttons > .btn {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+#language-select-dialog .language-buttons > .btn:hover {
+  border-color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+/* Small studio credit in the original HTML footer. */
+.trx-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: color-mix(in srgb, currentColor 68%, transparent);
+  font-size: .78rem;
+  letter-spacing: .01em;
+  opacity: .82;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.trx-credit:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.trx-credit img {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.trx-credit a {
+  color: inherit;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.trx-credit a:hover,
+.trx-credit a:focus-visible {
+  text-decoration: underline;
+}
+
+.trx-about-logo {
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  object-fit: cover;
+  margin-bottom: 10px;
+}

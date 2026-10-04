@@ -1,10 +1,12 @@
-class PairDrop {
+class ShareBka {
 
     constructor() {
         this.$headerNotificationBtn = $('notification');
         this.$headerEditPairedDevicesBtn = $('edit-paired-devices');
         this.$footerPairedDevicesBadge = $$('.discovery-wrapper .badge-room-secret');
         this.$headerInstallBtn = $('install');
+        this.deferredInstallPrompt = null;
+        this.$headerInstallBtn.addEventListener('click', () => this.installApp());
 
         this.deferredStyles = [
             "styles/styles-deferred.css"
@@ -23,6 +25,10 @@ class PairDrop {
         this.registerServiceWorker();
 
         Events.on('beforeinstallprompt', e => this.onPwaInstallable(e));
+        Events.on('appinstalled', () => {
+            this.deferredInstallPrompt = null;
+            this.$headerInstallBtn.setAttribute('hidden', true);
+        });
 
         this.persistentStorage = new PersistentStorage();
         this.localization = new Localization();
@@ -86,15 +92,29 @@ class PairDrop {
     }
 
     onPwaInstallable(e) {
-        if (!window.matchMedia('(display-mode: standalone)').matches) {
-            // only display install btn when not installed
-            this.$headerInstallBtn.removeAttribute('hidden');
-            this.$headerInstallBtn.addEventListener('click', () => {
-                this.$headerInstallBtn.setAttribute('hidden', true);
-                e.prompt();
-            });
+        // Keep the native prompt behind a clear header action. Browsers only
+        // allow it after a user gesture, so retain the event until click.
+        e.preventDefault();
+        if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+        this.deferredInstallPrompt = e;
+        this.$headerInstallBtn.removeAttribute('hidden');
+    }
+
+    async installApp() {
+        if (!this.deferredInstallPrompt) return;
+
+        const promptEvent = this.deferredInstallPrompt;
+        this.deferredInstallPrompt = null;
+        this.$headerInstallBtn.setAttribute('hidden', true);
+
+        try {
+            await promptEvent.prompt();
+            await promptEvent.userChoice;
         }
-        return e.preventDefault();
+        catch (error) {
+            console.warn('Install prompt was dismissed or unavailable.', error);
+        }
     }
 
     async evaluatePermissionsAndRoomSecrets() {
@@ -172,13 +192,13 @@ class PairDrop {
     }
 
     handleInitializationError(error) {
-        console.error('PairDrop initialization failed', error);
+        console.error('ShareBka initialization failed', error);
         document.querySelectorAll('.opacity-0').forEach(element => element.classList.remove('opacity-0'));
 
         const notice = document.createElement('div');
         notice.setAttribute('role', 'alert');
         notice.style.cssText = 'position:fixed;inset:1rem auto auto 1rem;right:1rem;z-index:10000;padding:1rem;border-radius:8px;background:#b3261e;color:#fff;font:16px sans-serif;';
-        notice.textContent = 'PairDrop could not finish loading. Reload to try again.';
+        notice.textContent = 'ShareBka could not finish loading. Reload to try again.';
 
         const retry = document.createElement('button');
         retry.type = 'button';
@@ -276,4 +296,4 @@ class PairDrop {
     }
 }
 
-const pairDrop = new PairDrop();
+const shareBka = new ShareBka();

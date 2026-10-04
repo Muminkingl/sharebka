@@ -1,3 +1,11 @@
+const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+}[character]));
+
 class PeersUI {
 
     constructor() {
@@ -84,7 +92,7 @@ class PeersUI {
             await this._deactivateShareMode();
         }
 
-        // close About PairDrop page on Escape
+        // close About ShareBka page on Escape
         if (e.key === "Escape") {
             window.location.hash = '#';
         }
@@ -758,8 +766,8 @@ class Dialog {
             document.activeElement.blur();
             window.blur();
         }
-        document.title = 'PairDrop | Transfer Files Cross-Platform. No Setup, No Signup.';
-        changeFavicon("images/favicon-96x96.png");
+        document.title = 'ShareBka';
+        changeFavicon("trx.svg");
         this.correspondingPeerId = undefined;
     }
 
@@ -822,7 +830,9 @@ class LanguageSelectDialog extends Dialog {
 
     selectLanguage(e) {
         e.preventDefault()
-        let languageCode = e.target.value;
+        // The language label contains nested spans, so the event target may
+        // be a span rather than the button that owns the locale value.
+        let languageCode = e.currentTarget.value;
 
         if (languageCode) {
             localStorage.setItem('language_code', languageCode);
@@ -1043,7 +1053,7 @@ class ReceiveFileDialog extends ReceiveDialog {
                 hours = hours.length < 2 ? "0" + hours : hours;
                 let minutes = now.getMinutes().toString();
                 minutes = minutes.length < 2 ? "0" + minutes : minutes;
-                filenameDownload = `PairDrop_files_${year+month+date}_${hours+minutes}.zip`;
+                filenameDownload = `ShareBka_files_${year+month+date}_${hours+minutes}.zip`;
             } catch (e) {
                 console.error(e);
                 downloadZipped = false;
@@ -1074,9 +1084,9 @@ class ReceiveFileDialog extends ReceiveDialog {
         };
 
         document.title = files.length === 1
-            ? `${ Localization.getTranslation("document-titles.file-received") } - PairDrop`
-            : `${ Localization.getTranslation("document-titles.file-received-plural", null, {count: files.length}) } - PairDrop`;
-        changeFavicon("images/favicon-96x96-notification.png");
+            ? `${ Localization.getTranslation("document-titles.file-received") } - ShareBka`
+            : `${ Localization.getTranslation("document-titles.file-received-plural", null, {count: files.length}) } - ShareBka`;
+        changeFavicon("trx.svg");
 
         Events.fire('set-progress', {peerId: peerId, progress: 1, status: 'process'})
         this.show();
@@ -1187,8 +1197,8 @@ class ReceiveRequestDialog extends ReceiveDialog {
 
         this.$receiveTitle.innerText = transferRequestTitle;
 
-        document.title =  `${transferRequestTitle} - PairDrop`;
-        changeFavicon("images/favicon-96x96-notification.png");
+        document.title =  `${transferRequestTitle} - ShareBka`;
+        changeFavicon("trx.svg");
 
         this.$acceptRequestBtn.removeAttribute('disabled');
         this.show();
@@ -1617,12 +1627,12 @@ class EditPairedDevicesDialog extends Dialog {
                 $pairedDevice.innerHTML = `
                     <div class="display-name">
                         <span class="fw">
-                            ${roomSecretsEntry.display_name}
+                            ${escapeHtml(roomSecretsEntry.display_name)}
                         </span>
                     </div>
                     <div class="device-name">
                         <span class="fw">
-                            ${roomSecretsEntry.device_name}
+                            ${escapeHtml(roomSecretsEntry.device_name)}
                         </span>
                     </div>
                     <div class="button-wrapper row fw center wrap">
@@ -2093,7 +2103,7 @@ class ReceiveTextDialog extends Dialog {
         window.blop.play();
         this._receiveTextQueue.push({text: text, peerId: peerId});
         this._setDocumentTitleMessages();
-        changeFavicon("images/favicon-96x96-notification.png");
+        changeFavicon("trx.svg");
 
         if (this.isShown() || this._hideTimeout) return;
 
@@ -2102,7 +2112,7 @@ class ReceiveTextDialog extends Dialog {
 
     _dequeueRequests() {
         this._setDocumentTitleMessages();
-        changeFavicon("images/favicon-96x96-notification.png");
+        changeFavicon("trx.svg");
 
         let {text, peerId} = this._receiveTextQueue.shift();
         this._showReceiveTextDialog(text, peerId);
@@ -2168,7 +2178,9 @@ class ReceiveTextDialog extends Dialog {
                 let linkNodePlaceholder = `${p}${m}`;
 
                 // add linkNodePlaceholder to text node and save a reference to linkNodes object
-                linkNodes[linkNodePlaceholder] = `<a href="${link}" target="_blank" rel="noreferrer">${url}</a>`;
+                // Both values originate in a peer message. Escape them before
+                // inserting the link into the sanitized text shadow HTML.
+                linkNodes[linkNodePlaceholder] = `<a href="${escapeHtml(link)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>`;
                 return `${whitespace}${linkNodePlaceholder}`;
             }
 
@@ -2189,8 +2201,8 @@ class ReceiveTextDialog extends Dialog {
 
     _setDocumentTitleMessages() {
         document.title = this._receiveTextQueue.length <= 1
-            ? `${ Localization.getTranslation("document-titles.message-received") } - PairDrop`
-            : `${ Localization.getTranslation("document-titles.message-received-plural", null, {count: this._receiveTextQueue.length + 1}) } - PairDrop`;
+            ? `${ Localization.getTranslation("document-titles.message-received") } - ShareBka`
+            : `${ Localization.getTranslation("document-titles.message-received-plural", null, {count: this._receiveTextQueue.length + 1}) } - ShareBka`;
     }
 
     async _onCopy() {
@@ -2568,7 +2580,7 @@ class Notifications {
     _notify(title, body, data = {}) {
         const config = {
             body: body,
-            icon: '/images/logo_transparent_128x128.png',
+            icon: '/trx.svg',
             data: data,
         }
         let notification;

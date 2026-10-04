@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "PairDrop | Transfer Files Cross-Platform",
+  title: "ShareBka",
   description: "Instantly share files and text peer-to-peer. No setup, no signup.",
   icons: {
-    icon: "/images/favicon-96x96.png",
-    apple: "/images/apple-touch-icon.png",
+    icon: "/trx.svg",
+    apple: "/trx.svg",
   },
 };
 
@@ -13,7 +13,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <head>
-        <link rel="shortcut icon" href="/images/favicon-96x96.png" />
+        <link rel="icon" type="image/svg+xml" href="/trx.svg" />
       </head>
       <body translate="no">{children}</body>
     </html>

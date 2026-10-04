@@ -1,0 +1,694 @@
+/* ==========================================================================
+   Sharebka Luxury Modern UI Design System
+   Matches idea.html layout architecture with modern luxury aesthetic
+   ========================================================================== */
+
+html, body {
+  background-color: #060813 !important;
+  color: #f1f5f9 !important;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  /* Single-hue ambient glow — no rainbow, no AI template slop */
+  background-image:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(37, 99, 235, 0.10), transparent 52%) !important;
+  background-size: 100% 100% !important;
+}
+
+/* ==========================================================================
+   PairDrop Root Native Architecture Styling
+   ========================================================================== */
+#pairdrop-root {
+  min-height: 100vh;
+}
+
+/* Hide legacy raw header & footer (replaced by SharebkaExperience) */
+#pairdrop-root > header {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+#pairdrop-root > footer {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Radar Canvas Circles */
+#pairdrop-root canvas.circles,
+canvas.circles {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+  opacity: 0.65 !important;
+  filter: drop-shadow(0 0 16px rgba(59, 130, 246, 0.35)) !important;
+}
+
+/* Center Stage (Peers & Radar Canvas Core) */
+#center {
+  position: relative !important;
+  z-index: 10 !important;
+  min-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  max-width: 960px !important;
+  margin: 0 auto !important;
+  padding: 80px 24px 210px !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
+  opacity: 1 !important;
+}
+
+/* No Peers State (Empty Stage) */
+x-no-peers {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  width: 100% !important;
+  max-width: 680px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+x-no-peers::before,
+x-no-peers::after {
+  display: none !important;
+}
+
+x-no-peers h2 {
+  font-size: clamp(26px, 4.2vw, 46px) !important;
+  font-weight: 750 !important;
+  letter-spacing: -0.04em !important;
+  line-height: 1.18 !important;
+  color: #ffffff !important;
+  margin: 0 0 12px 0 !important;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+}
+
+x-no-peers div {
+  font-size: clamp(14px, 1.8vw, 16px) !important;
+  color: #94a3b8 !important;
+  max-width: 500px !important;
+  line-height: 1.6 !important;
+  margin: 0 auto !important;
+}
+
+/* Peers Connected State (Active Devices on Radar) */
+x-peers {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 22px !important;
+  width: 100% !important;
+  max-width: 860px !important;
+  z-index: 15 !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+}
+
+x-peer {
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 14px 18px !important;
+  border-radius: 20px !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(20px) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45) !important;
+  cursor: pointer !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  min-width: 105px !important;
+}
+
+x-peer:hover {
+  transform: translateY(-4px) scale(1.04) !important;
+  border-color: rgba(96, 165, 250, 0.5) !important;
+  box-shadow: 0 18px 40px rgba(59, 130, 246, 0.25) !important;
+  background: rgba(30, 41, 59, 0.92) !important;
+}
+
+x-peer[drop] {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.35), 0 16px 36px rgba(59, 130, 246, 0.3) !important;
+}
+
+x-peer .icon-wrapper {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  background: rgba(59, 130, 246, 0.18) !important;
+  border: 1px solid rgba(59, 130, 246, 0.35) !important;
+  display: grid !important;
+  place-items: center !important;
+  margin-bottom: 8px !important;
+}
+
+x-peer .icon-wrapper svg {
+  width: 24px !important;
+  height: 24px !important;
+  fill: #93c5fd !important;
+}
+
+x-peer .name {
+  color: #f8fafc !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  text-align: center !important;
+}
+
+x-peer .device-name {
+  color: #94a3b8 !important;
+  font-size: 11px !important;
+  margin-top: 2px !important;
+  text-align: center !important;
+}
+
+/* ==========================================================================
+   Sharebka Experience Overlay Shell
+   ========================================================================== */
+.sharebka-overlay-shell {
+  pointer-events: none;
+  position: relative;
+  z-index: 30;
+}
+
+/* ==========================================================================
+   Top Navigation Bar
+   ========================================================================== */
+.sharebka-navbar {
+  pointer-events: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  width: 100%;
+  height: 64px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 8, 19, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.navbar-container {
+  max-width: 1240px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* Brand */
+.brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: default;
+}
+
+.brand-mark-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: rotate(-6deg);
+  transition: transform 0.25s ease;
+}
+
+.brand-mark-wrapper:hover {
+  transform: rotate(0deg) scale(1.05);
+}
+
+.brand-bar {
+  width: 3.5px;
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.bar-1 { height: 10px; opacity: 0.75; }
+.bar-2 { height: 18px; opacity: 1; }
+.bar-3 { height: 13px; opacity: 0.88; }
+
+.brand-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+
+.brand-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  padding: 2px 8px;
+  border-radius: 9999px;
+}
+
+/* Header Network Status Pill */
+.network-pill-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  font-size: 12px;
+  font-weight: 500;
+  color: #cbd5e1;
+}
+
+.network-dot-header {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.network-dot-header.online {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2), 0 0 10px #10b981;
+}
+
+.network-dot-header.connecting {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2), 0 0 10px #f59e0b;
+}
+
+/* Nav Actions */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.action-icon-btn.icon-only {
+  width: 34px;
+  padding: 0;
+}
+
+.action-icon-btn:hover,
+.action-icon-btn.active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.action-icon-btn:active {
+  transform: translateY(0);
+}
+
+/* Settings Popover */
+.settings-wrapper {
+  position: relative;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  z-index: 60;
+  min-width: 170px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px);
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+/* ==========================================================================
+   Bottom Floating Control Hub
+   ========================================================================== */
+.sharebka-bottom-hub {
+  pointer-events: auto;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px 18px;
+  background: linear-gradient(to top, #060813 50%, rgba(6, 8, 19, 0.92) 80%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Device Identity Capsule with Perfectly Fitted Shared EditableChip */
+.identity-dock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(520px, 92vw);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.identity-icon-bubble {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.identity-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.identity-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+/* Seamless fit for watermelon EditableChip */
+.identity-editable-chip {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  height: 34px !important;
+  padding: 0 10px 0 12px !important;
+}
+
+.identity-editable-chip:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.identity-editable-chip input {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important;
+}
+
+.identity-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #34d399;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.discovery-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.discovery-status-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.discovery-status-dot.connecting {
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+}
+
+/* ==========================================================================
+   Action Dock (Send files, Show QR, Copy Link)
+   ========================================================================== */
+.action-dock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.action-dock-btn.send-btn {
+  display: inline-flex;
+  height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 22px;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: #09090b;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.action-dock-btn.send-btn:hover {
+  transform: translateY(-1px);
+  background: #f4f4f5;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+
+.action-dock-btn.send-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+}
+
+.action-dock-item {
+  display: flex;
+  align-items: center;
+}
+
+/* Room & Pairing Shortcuts */
+.room-shortcuts {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.shortcut-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+.shortcut-link:hover {
+  color: #93c5fd;
+}
+
+.shortcut-divider {
+  color: #475569;
+}
+
+/* ==========================================================================
+   Trust Footer Badges
+   ========================================================================== */
+.trust-footer {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.trust-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   PairDrop Overlays & Dialogs Integration
+   ========================================================================== */
+#pairdrop-root x-dialog {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1000 !important;
+  display: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+}
+
+#pairdrop-root x-dialog[show] {
+  display: flex !important;
+}
+
+#pairdrop-root x-paper {
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6) !important;
+  color: #f1f5f9 !important;
+  padding: 24px !important;
+  max-width: 480px !important;
+  width: min(92vw, 480px) !important;
+}
+
+#pairdrop-root x-paper h2 {
+  color: #ffffff !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+}
+
+#pairdrop-root x-paper button,
+#pairdrop-root x-paper .btn {
+  border-radius: 9999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #f1f5f9 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+#pairdrop-root x-paper button:hover,
+#pairdrop-root x-paper .btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* ==========================================================================
+   Responsive Adaptations
+   ========================================================================== */
+@media (max-width: 640px) {
+  .navbar-container {
+    padding: 0 16px;
+  }
+  .network-pill-header {
+    display: none;
+  }
+  .action-btn-text {
+    display: none;
+  }
+  .action-icon-btn {
+    width: 34px;
+    padding: 0;
+  }
+  #center {
+    padding: 70px 16px 230px !important;
+  }
+  .identity-dock {
+    flex-direction: column;
+    border-radius: 24px;
+    padding: 10px 14px;
+    gap: 8px;
+  }
+  .identity-icon-bubble {
+    display: none;
+  }
+  .trust-footer {
+    gap: 10px 14px;
+    margin-top: 8px;
+  }
+}
