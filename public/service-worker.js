@@ -1,10 +1,12 @@
 // Bump this whenever the shell or runtime changes. The old worker cached the
 // legacy index at `/`, which could keep stale JavaScript alive after deploys.
-const cacheVersion = 'v1.13.0-sharebka';
+const cacheVersion = 'v1.14.0-installable';
 const cacheTitle = `sharebka-cache-${cacheVersion}`;
 const relativePathsToCache = [
     'manifest.json',
     'trx.svg',
+    'trx-192.png',
+    'trx-512.png',
     'styles/styles-main.css',
     'styles/styles-deferred.css',
     'scripts/browser-tabs-connector.js',

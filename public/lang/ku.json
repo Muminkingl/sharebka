@@ -46,8 +46,7 @@
         "public-room-devices_title": "ئامێرەکانی ئەم ژوورە گشتییە دەتوانن بتدۆزنەوە، لە هەر تۆڕێک بێت.",
         "traffic": "ترافیک",
         "routed": "لە ڕێگەی ڕاژەکارەکەوە دەگوازرێتەوە",
-        "webrtc": "کاتێک WebRTC بەردەست نەبێت.",
-        "recreated-by": "دروستکراوەتەوە لەلایەن"
+        "webrtc": "کاتێک WebRTC بەردەست نەبێت."
     },
     "dialogs": {
         "pair-devices-title": "ئامێرەکان بە شێوەی هەمیشەیی پەیوەست بکە",
@@ -163,7 +162,8 @@
         "message-transfer-completed": "گواستنەوەی پەیام تەواو بوو",
         "unfinished-transfers-warning": "هێشتا گواستنەوەی تەواونەکراو هەیە. دڵنیایت دەتەوێت ShareBka دابخەیت؟",
         "rate-limit-join-key": "سنووری هەوڵەکان پڕبوو. ١٠ چرکە چاوەڕێ بکە و دووبارە هەوڵ بدە.",
-        "selected-peer-left": "ئامێری هەڵبژێردراو دەرچوو"
+        "selected-peer-left": "ئامێری هەڵبژێردراو دەرچوو",
+        "install-instructions": "بۆ دامەزراندنی ShareBka، لیستی وێبگەڕەکەت بکەرەوە و «دامەزراندنی ئەپ» هەڵبژێرە."
     },
     "document-titles": {
         "file-received": "فایل وەرگیرا",

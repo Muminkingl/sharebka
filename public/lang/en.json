@@ -46,8 +46,7 @@
         "public-room-devices_title": "You can be discovered by devices in this public room independent of the network.",
         "traffic": "Traffic is",
         "routed": "routed through the server",
-        "webrtc": "if WebRTC is not available.",
-        "recreated-by": "Recreated by"
+        "webrtc": "if WebRTC is not available."
     },
     "dialogs": {
         "pair-devices-title": "Pair Devices Permanently",
@@ -163,7 +162,8 @@
         "message-transfer-completed": "Message transfer completed",
         "unfinished-transfers-warning": "There are unfinished transfers. Are you sure you want to close ShareBka?",
         "rate-limit-join-key": "Rate limit reached. Wait 10 seconds and try again.",
-        "selected-peer-left": "Selected peer left"
+        "selected-peer-left": "Selected peer left",
+        "install-instructions": "To install ShareBka, use your browser menu and choose “Install app”."
     },
     "document-titles": {
         "file-received": "File Received",

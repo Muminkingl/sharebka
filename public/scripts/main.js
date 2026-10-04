@@ -7,6 +7,7 @@ class ShareBka {
         this.$headerInstallBtn = $('install');
         this.deferredInstallPrompt = null;
         this.$headerInstallBtn.addEventListener('click', () => this.installApp());
+        if (this.isStandalone()) this.$headerInstallBtn.setAttribute('hidden', true);
 
         this.deferredStyles = [
             "styles/styles-deferred.css"
@@ -95,14 +96,17 @@ class ShareBka {
         // Keep the native prompt behind a clear header action. Browsers only
         // allow it after a user gesture, so retain the event until click.
         e.preventDefault();
-        if (window.matchMedia('(display-mode: standalone)').matches) return;
+        if (this.isStandalone()) return;
 
         this.deferredInstallPrompt = e;
         this.$headerInstallBtn.removeAttribute('hidden');
     }
 
     async installApp() {
-        if (!this.deferredInstallPrompt) return;
+        if (!this.deferredInstallPrompt) {
+            Events.fire('notify-user', Localization.getTranslation('notifications.install-instructions'));
+            return;
+        }
 
         const promptEvent = this.deferredInstallPrompt;
         this.deferredInstallPrompt = null;
@@ -115,6 +119,10 @@ class ShareBka {
         catch (error) {
             console.warn('Install prompt was dismissed or unavailable.', error);
         }
+    }
+
+    isStandalone() {
+        return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     }
 
     async evaluatePermissionsAndRoomSecrets() {

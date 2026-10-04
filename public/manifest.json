@@ -3,13 +3,25 @@
     "short_name": "ShareBka",
     "icons": [
         {
+            "src": "trx-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "trx-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
             "src": "trx.svg",
             "sizes": "any",
             "type": "image/svg+xml"
         }
     ],
     "background_color": "#efefef",
-    "start_url": "./",
+    "start_url": "/",
     "display": "standalone",
     "theme_color": "#3367d6",
     "share_target": {
@@ -33,5 +45,7 @@
     "launch_handler": {
         "client_mode": "focus-existing"
     },
-    "description": "Share files and messages privately across your devices with ShareBka."
+    "description": "Share files and messages privately across your devices with ShareBka.",
+    "id": "/",
+    "scope": "/"
 }
