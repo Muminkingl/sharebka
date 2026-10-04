@@ -470,8 +470,12 @@ PRIVACYPOLICY_BUTTON_TITLE="Open our privacy policy"
 
 ## HTTP-Server
 
-When running PairDrop, the `X-Forwarded-For` header has to be set by a proxy. \
-Otherwise, all clients will be mutually visible.
+When running PairDrop behind a reverse proxy, configure the proxy to overwrite
+`X-Forwarded-For` and start the signaling server with `TRUST_PROXY=true`.
+PairDrop uses the direct socket address by default so a browser cannot spoof an
+IP room by sending forwarding headers. For Cloudflare, also set
+`TRUST_CF_CONNECTING_IP=true`. Never expose a proxy-trusting Node port directly
+to the internet.
 
 To check if your setup is configured correctly [use the environment variable `DEBUG_MODE="true"`](#debug-mode).
 

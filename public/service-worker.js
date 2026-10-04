@@ -1,8 +1,8 @@
-const cacheVersion = 'v1.11.2';
+// Bump this whenever the shell or runtime changes. The old worker cached the
+// legacy index at `/`, which could keep stale JavaScript alive after deploys.
+const cacheVersion = 'v1.12.0-next';
 const cacheTitle = `pairdrop-cache-${cacheVersion}`;
 const relativePathsToCache = [
-    './',
-    'index.html',
     'manifest.json',
     'styles/styles-main.css',
     'styles/styles-deferred.css',
@@ -65,6 +65,9 @@ const relativePathsToCache = [
     'lang/zh-TW.json'
 ];
 const relativePathsNotToCache = [
+    '',
+    '/',
+    'index.html',
     'config'
 ]
 
@@ -123,8 +126,11 @@ const rootUrl = location.href.substring(0, location.href.length - "service-worke
 const rootUrlLength = rootUrl.length;
 
 const doNotCacheRequest = request => {
-    const requestRelativePath = request.url.substring(rootUrlLength);
-    return relativePathsNotToCache.indexOf(requestRelativePath) !== -1
+    const requestUrl = new URL(request.url);
+    const requestRelativePath = requestUrl.pathname.substring(new URL(rootUrl).pathname.length).replace(/^\/+/, '');
+    return request.mode === 'navigate'
+        || requestRelativePath.startsWith('_next/')
+        || relativePathsNotToCache.indexOf(requestRelativePath) !== -1
 };
 
 // cache the current page to make it available for offline
@@ -188,6 +194,21 @@ self.addEventListener('fetch', function(event) {
     }
 });
 
+// Keep PWA notifications useful when the page is backgrounded. The page can
+// decide what action to take after it is focused.
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(windowClients => {
+        for (const client of windowClients) {
+            if ('focus' in client) {
+                client.postMessage({type: 'notification-click', data: event.notification.data || {}});
+                return client.focus();
+            }
+        }
+        if (clients.openWindow) return clients.openWindow(new URL('/', self.location.origin).toString());
+    }));
+});
+
 
 // on activation, we clean up the previously registered service workers
 self.addEventListener('activate', evt => {
@@ -224,11 +245,47 @@ const evaluateRequestData = function (request) {
             for (let i=0; i<files.length; i++) {
                 fileObjects.push({
                     name: files[i].name,
+                    type: files[i].type,
                     buffer: await files[i].arrayBuffer()
                 });
             }
 
-            const DBOpenRequest = indexedDB.open('pairdrop_store');
+            // A share-target POST can be the first PairDrop request on a new
+            // device, before the page has initialized IndexedDB. Open the
+            // current schema here and create the stores the worker needs.
+            const DBOpenRequest = indexedDB.open('pairdrop_store', 6);
+            DBOpenRequest.onupgradeneeded = e => {
+                const db = e.target.result;
+                const txn = e.target.transaction;
+                if (!db.objectStoreNames.contains('keyval')) db.createObjectStore('keyval');
+                else {
+                    const keyval = txn.objectStore('keyval');
+                    const displayNameRequest = keyval.get('editedDisplayName');
+                    displayNameRequest.onsuccess = displayNameEvent => {
+                        if (!displayNameEvent.target.result) return;
+                        keyval.put(displayNameEvent.target.result, 'edited_display_name');
+                        keyval.delete('editedDisplayName');
+                    };
+                }
+                if (!db.objectStoreNames.contains('room_secrets')) {
+                    const roomSecrets = db.createObjectStore('room_secrets', {autoIncrement: true});
+                    roomSecrets.createIndex('secret', 'secret', {unique: false});
+                }
+                else {
+                    const roomSecrets = txn.objectStore('room_secrets');
+                    if (roomSecrets.indexNames.contains('secret')) roomSecrets.deleteIndex('secret');
+                    roomSecrets.createIndex('secret', 'secret', {unique: false});
+                    const scope = `${self.location.origin}${new URL(self.registration.scope).pathname}`.replace(/\/+$/, '/');
+                    const cursorRequest = roomSecrets.openCursor();
+                    cursorRequest.onsuccess = cursorEvent => {
+                        const cursor = cursorEvent.target.result;
+                        if (!cursor) return;
+                        if (!cursor.value.scope) cursor.update(Object.assign({}, cursor.value, {scope: scope}));
+                        cursor.continue();
+                    };
+                }
+                if (!db.objectStoreNames.contains('share_target_files')) db.createObjectStore('share_target_files', {autoIncrement: true});
+            };
             DBOpenRequest.onsuccess = e => {
                 const db = e.target.result;
                 for (let i = 0; i < fileObjects.length; i++) {

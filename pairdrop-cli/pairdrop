@@ -130,6 +130,14 @@ sendFiles()
   fileCount=0
   pathsPS=""
 
+  cleanup_send_files() {
+    [[ -n "${encodedHashPath:-}" ]] && rm -f "$encodedHashPath"
+    [[ -n "${zipToSendAbs:-}" ]] && rm -f "$zipToSendAbs"
+    [[ -n "${wrapperZipAbs:-}" ]] && rm -f "$wrapperZipAbs"
+  }
+  trap cleanup_send_files EXIT
+  trap 'cleanup_send_files; exit 130' INT TERM
+
   #create tmp folder if it does not exist already
   if [[ ! -d "$tmpDir" ]]; then
     mkdir "$tmpDir"
@@ -273,24 +281,29 @@ sendFiles()
     zipToSendAbs=$wrapperZipAbs
   fi
 
-  # base64 encode zip file
+  # Base64 encode to a temporary file. Keeping the encoded archive in a shell
+  # variable doubled peak memory for large transfers and made the CLI fail on
+  # constrained machines.
+  encodedHashPath="${tmpDir}pairdrop_hash_temp"
   if [[ $OS == "Mac" ]];then
-    hash=$(base64 -i "$zipToSendAbs")
+    base64 -i "$zipToSendAbs" | tr -d '\n' > "$encodedHashPath"
   else
-    hash=$(base64 -w 0 "$zipToSendAbs")
+    base64 -w 0 "$zipToSendAbs" > "$encodedHashPath"
   fi
 
   # remove zip file (do not differentiate between OS as this is done via Git Bash on Windows)
   rm "$zipToSendAbs"
 
-  if [[ $(echo -n "$hash" | wc -m) -gt 1000 ]];then
+  encodedHashSize=$(wc -c < "$encodedHashPath")
+  if [[ $encodedHashSize -gt 1000 ]];then
     params="base64zip=paste"
 
-    # Copy $hash to clipboard
+    # Copy the encoded stream to the clipboard without loading it into a
+    # second shell variable.
     if [[ $OS == "Windows" || $OS == "WSL" || $OS == "WSL2" ]];then
-      echo -n "$hash" | clip.exe
+      clip.exe < "$encodedHashPath"
     elif [[ $OS == "Mac" ]];then
-      echo -n "$hash" | pbcopy
+      pbcopy < "$encodedHashPath"
     elif [ -n "$WAYLAND_DISPLAY" ]; then
       # Wayland
       if ! command -v wl-copy &> /dev/null; then
@@ -299,9 +312,7 @@ sendFiles()
           exit 1
       fi
       # Workaround to prevent use of Pipe which has a max letter limit
-      echo -n "$hash" > /tmp/pairdrop-cli-temp/pairdrop_hash_temp
-      wl-copy < /tmp/pairdrop-cli-temp/pairdrop_hash_temp
-      rm /tmp/pairdrop-cli-temp/pairdrop_hash_temp
+      wl-copy < "$encodedHashPath"
     else
       # X11
       if ! command -v xclip &> /dev/null; then
@@ -309,10 +320,14 @@ sendFiles()
           echo "Try: sudo apt install xclip"
           exit 1
       fi
-      echo -n "$hash" | xclip -sel c
+      xclip -sel c < "$encodedHashPath"
     fi
     hash=
+  else
+    hash=$(cat "$encodedHashPath")
   fi
+
+  rm -f "$encodedHashPath"
 
   openPairDrop
   exit

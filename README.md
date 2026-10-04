@@ -116,6 +116,12 @@ Connect to others in complex network situations, or over the Internet.
 
 [Host your own instance with Docker or Node.js](docs/host-your-own.md).
 
+## Next.js frontend deployment
+
+The frontend is now a Next.js App Router application. See [the frontend and Oracle signaling deployment guide](docs/next-frontend.md) for running the Next app on Vercel and the WebSocket backend on Oracle.
+
+When the signaling process is behind a reverse proxy, set `TRUST_PROXY=true` only after the proxy overwrites `X-Forwarded-For`; add `TRUST_CF_CONNECTING_IP=true` for Cloudflare. The backend otherwise ignores forwarded headers to prevent IP-room spoofing.
+
 ## Support
 <a href="https://www.buymeacoffee.com/pairdrop" target="_blank">
 <img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy me a coffee" style="height: 60px !important;width: 217px !important;" >

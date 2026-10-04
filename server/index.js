@@ -57,6 +57,21 @@ conf.signalingServer = process.env.SIGNALING_SERVER && process.env.SIGNALING_SER
 
 conf.ipv6Localize = parseInt(process.env.IPV6_LOCALIZE) || false;
 
+// WebSocket clients connect directly to this process in the default setup.
+// Only trust proxy supplied client addresses when the deployment explicitly
+// opts in. This prevents an untrusted browser from spoofing an IP room by
+// sending X-Forwarded-For or CF-Connecting-IP headers through a direct proxy.
+conf.trustProxy = process.env.TRUST_PROXY === "true";
+conf.trustCloudflareIp = process.env.TRUST_CF_CONNECTING_IP === "true";
+
+// Restrict browser HTTP and WebSocket requests to an explicit origin allowlist
+// when the backend is deployed separately from the frontend. Leave unset for
+// local development, where requests from any origin are accepted.
+conf.allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(origin => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
 let rateLimit = false;
 if (process.argv.includes('--rate-limit') || process.env.RATE_LIMIT === "true") {
     rateLimit = 5;

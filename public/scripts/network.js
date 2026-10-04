@@ -1,11 +1,22 @@
 class ServerConnection {
 
     constructor() {
-        Events.on('pagehide', _ => this._disconnect());
+        this._lastMessageAt = Date.now();
+        Events.on('pagehide', e => {
+            // A persisted pagehide means the browser is putting the page in
+            // the back-forward cache (common while a mobile picker is open).
+            // Keep the socket alive and revalidate it on pageshow.
+            if (!e || !e.persisted) this._disconnect();
+        });
+        Events.on('pageshow', _ => this._connect());
         Events.on(window.visibilityChangeEvent, _ => this._onVisibilityChange());
 
         if (navigator.connection) {
-            navigator.connection.addEventListener('change', _ => this._reconnect());
+            // A change to the browser's connection metadata is not a socket
+            // failure. Reconnecting here interrupts active transfers (and was
+            // especially visible on mobile networks). Let the socket's close
+            // handler deal with real connectivity loss.
+            navigator.connection.addEventListener('change', _ => this._connect());
         }
 
         Events.on('room-secrets', e => this.send({ type: 'room-secrets', roomSecrets: e.detail }));
@@ -132,7 +143,14 @@ class ServerConnection {
     }
 
     _onMessage(msg) {
-        msg = JSON.parse(msg);
+        this._lastMessageAt = Date.now();
+        try {
+            msg = JSON.parse(msg);
+        } catch (e) {
+            console.error('WS receive: malformed message', e);
+            return;
+        }
+        if (!msg || typeof msg !== 'object') return;
         if (msg.type !== 'ping') console.log('WS receive:', msg);
         switch (msg.type) {
             case 'ws-config':
@@ -249,6 +267,7 @@ class ServerConnection {
         let wsServerDomain = this._config.signalingServer
             ? this._config.signalingServer
             : location.host + location.pathname;
+        if (!wsServerDomain.endsWith('/')) wsServerDomain += '/';
 
         let wsUrl = new URL(protocol + '://' + wsServerDomain + 'server');
 
@@ -293,7 +312,7 @@ class ServerConnection {
     }
 
     _onVisibilityChange() {
-        if (window.hiddenProperty) return;
+        if (window.hiddenProperty && document[window.hiddenProperty]) return;
         this._connect();
     }
 
@@ -314,9 +333,20 @@ class ServerConnection {
     }
 
     _reconnect() {
-        this._disconnect();
+        // Kept for integrations that call this method directly. Do not tear
+        // down a healthy socket because that can corrupt an in-flight file.
         this._connect();
     }
+}
+
+function normalizeTransferFileName(name) {
+    if (typeof name !== 'string') return '';
+    try {
+        name = decodeURIComponent(name);
+    } catch (_) {
+        // Keep the original name when it contains a malformed escape.
+    }
+    return name.replace(/[\\/\u0000\r\n]/g, '_').trim() || 'download';
 }
 
 class Peer {
@@ -434,13 +464,14 @@ class Peer {
     }
 
     async requestFileTransfer(files) {
+        if (!files || !files.length) return;
         let header = [];
         let totalSize = 0;
         let imagesOnly = true
         for (let i=0; i<files.length; i++) {
             Events.fire('set-progress', {peerId: this._peerId, progress: 0.8*i/files.length, status: 'prepare'})
             header.push({
-                name: files[i].name,
+                name: normalizeTransferFileName(files[i].name),
                 mime: files[i].type,
                 size: files[i].size
             });
@@ -461,9 +492,13 @@ class Peer {
 
         Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'prepare'})
 
-        this._filesRequested = files;
+        this._filesRequested = [...files];
+        this._transferId = (window.crypto && window.crypto.randomUUID)
+            ? window.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
         this.sendJSON({type: 'request',
+            transferId: this._transferId,
             header: header,
             totalSize: totalSize,
             imagesOnly: imagesOnly,
@@ -473,6 +508,7 @@ class Peer {
     }
 
     async sendFiles() {
+        if (!this._filesRequested || !this._filesRequested.length) return;
         for (let i=0; i<this._filesRequested.length; i++) {
             this._filesQueue.push(this._filesRequested[i]);
         }
@@ -490,14 +526,27 @@ class Peer {
     async _sendFile(file) {
         this.sendJSON({
             type: 'header',
+            transferId: this._transferId,
             size: file.size,
-            name: file.name,
+            name: normalizeTransferFileName(file.name),
             mime: file.type
         });
         this._chunker = new FileChunker(file,
             chunk => this._send(chunk),
-            offset => this._onPartitionEnd(offset));
+            offset => this._onPartitionEnd(offset),
+            error => this._onFileReadError(error));
         this._chunker.nextPartition();
+    }
+
+    _onFileReadError(error) {
+        console.error('Could not read file for transfer', error);
+        this._chunker = null;
+        this._filesQueue = [];
+        this._filesRequested = null;
+        this._busy = false;
+        if (this._transferId) this.sendJSON({type: 'file-transfer-complete', transferId: this._transferId, ok: false});
+        this._transferId = null;
+        Events.fire('notify-user', Localization.getTranslation("notifications.files-incorrect"));
     }
 
     _onPartitionEnd(offset) {
@@ -522,7 +571,14 @@ class Peer {
             this._onChunkReceived(message);
             return;
         }
-        const messageJSON = JSON.parse(message);
+        let messageJSON;
+        try {
+            messageJSON = JSON.parse(message);
+        } catch (e) {
+            console.error('Peer received malformed message', e);
+            return;
+        }
+        if (!messageJSON || typeof messageJSON !== 'object') return;
         switch (messageJSON.type) {
             case 'request':
                 this._onFilesTransferRequest(messageJSON);
@@ -543,7 +599,7 @@ class Peer {
                 this._onFileTransferRequestResponded(messageJSON);
                 break;
             case 'file-transfer-complete':
-                this._onFileTransferCompleted();
+                this._onFileTransferCompleted(messageJSON);
                 break;
             case 'message-transfer-complete':
                 this._onMessageTransferCompleted();
@@ -558,15 +614,26 @@ class Peer {
     }
 
     _onFilesTransferRequest(request) {
+        const requestedHeaderTotal = request && Array.isArray(request.header)
+            ? request.header.reduce((total, file) => total + (file && Number.isFinite(file.size) ? file.size : 0), 0)
+            : -1;
+        if (!request || !Array.isArray(request.header) || !request.header.length
+            || !Number.isFinite(request.totalSize) || request.totalSize < 0
+            || requestedHeaderTotal !== request.totalSize
+            || request.header.some(file => !file || typeof file.name !== 'string'
+                || !Number.isFinite(file.size) || file.size < 0)) {
+            this.sendJSON({type: 'files-transfer-response', accepted: false, reason: 'invalid-request', transferId: request && request.transferId});
+            return;
+        }
         if (this._requestPending) {
             // Only accept one request at a time per peer
-            this.sendJSON({type: 'files-transfer-response', accepted: false});
+            this.sendJSON({type: 'files-transfer-response', accepted: false, transferId: request.transferId});
             return;
         }
         if (window.iOS && request.totalSize >= 200*1024*1024) {
             // iOS Safari can only put 400MB at once to memory.
             // Request to send them in chunks of 200MB instead:
-            this.sendJSON({type: 'files-transfer-response', accepted: false, reason: 'ios-memory-limit'});
+            this.sendJSON({type: 'files-transfer-response', accepted: false, reason: 'ios-memory-limit', transferId: request.transferId});
             return;
         }
 
@@ -586,9 +653,11 @@ class Peer {
     }
 
     _respondToFileTransferRequest(accepted) {
-        this.sendJSON({type: 'files-transfer-response', accepted: accepted});
+        const transferId = this._requestPending && this._requestPending.transferId;
+        this.sendJSON({type: 'files-transfer-response', accepted: accepted, transferId: transferId});
         if (accepted) {
             this._requestAccepted = this._requestPending;
+            this._transferId = transferId;
             this._totalBytesReceived = 0;
             this._busy = true;
             this._filesReceived = [];
@@ -597,7 +666,10 @@ class Peer {
     }
 
     _onFileHeader(header) {
-        if (this._requestAccepted && this._requestAccepted.header.length) {
+        if (this._requestAccepted && this._requestAccepted.header.length
+            && header && typeof header.name === 'string'
+            && Number.isFinite(header.size) && header.size >= 0
+            && (!header.transferId || header.transferId === this._transferId)) {
             this._lastProgress = 0;
             this._digester = new FileDigester({size: header.size, name: header.name, mime: header.mime},
                 this._requestAccepted.totalSize,
@@ -608,12 +680,17 @@ class Peer {
     }
 
     _abortTransfer() {
+        if (this._transferId) {
+            this.sendJSON({type: 'file-transfer-complete', transferId: this._transferId, ok: false});
+        }
         Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
         Events.fire('notify-user', Localization.getTranslation("notifications.files-incorrect"));
         this._filesReceived = [];
         this._requestAccepted = null;
         this._digester = null;
-        throw new Error("Received files differ from requested files. Abort!");
+        this._busy = false;
+        this._transferId = null;
+        return false;
     }
 
     _onChunkReceived(chunk) {
@@ -624,6 +701,7 @@ class Peer {
 
         if (progress > 1) {
             this._abortTransfer();
+            return;
         }
 
         this._onDownloadProgress(progress);
@@ -639,16 +717,27 @@ class Peer {
     }
 
     async _onFileReceived(fileBlob) {
+        if (!this._requestAccepted || !Array.isArray(this._requestAccepted.header)) {
+            this._abortTransfer();
+            return;
+        }
         const acceptedHeader = this._requestAccepted.header.shift();
+        if (!acceptedHeader) {
+            this._abortTransfer();
+            return;
+        }
         this._totalBytesReceived += fileBlob.size;
-
-        this.sendJSON({type: 'file-transfer-complete'});
 
         const sameSize = fileBlob.size === acceptedHeader.size;
         const sameName = fileBlob.name === acceptedHeader.name
         if (!sameSize || !sameName) {
             this._abortTransfer();
+            return;
         }
+
+        // A completion acknowledgement is sent only after validation. The
+        // previous ordering let a truncated file be reported as complete.
+        this.sendJSON({type: 'file-transfer-complete', transferId: this._transferId, ok: true});
 
         // include for compatibility with 'Snapdrop & PairDrop for Android' app
         Events.fire('file-received', fileBlob);
@@ -660,13 +749,24 @@ class Peer {
             Events.fire('files-received', {peerId: this._peerId, files: this._filesReceived, imagesOnly: this._requestAccepted.imagesOnly, totalSize: this._requestAccepted.totalSize});
             this._filesReceived = [];
             this._requestAccepted = null;
+            this._transferId = null;
         }
     }
 
-    _onFileTransferCompleted() {
+    _onFileTransferCompleted(message = {}) {
+        if (message.transferId && this._transferId && message.transferId !== this._transferId) return;
         this._chunker = null;
+        if (message.ok === false) {
+            this._filesRequested = null;
+            this._filesQueue = [];
+            this._busy = false;
+            this._transferId = null;
+            Events.fire('notify-user', Localization.getTranslation("notifications.files-incorrect"));
+            return;
+        }
         if (!this._filesQueue.length) {
             this._busy = false;
+            this._transferId = null;
             Events.fire('notify-user', Localization.getTranslation("notifications.file-transfer-completed"));
             Events.fire('files-sent'); // used by 'Snapdrop & PairDrop for Android' app
         }
@@ -679,11 +779,13 @@ class Peer {
         if (!message.accepted) {
             Events.fire('set-progress', {peerId: this._peerId, progress: 1, status: 'wait'});
             this._filesRequested = null;
+            this._transferId = null;
             if (message.reason === 'ios-memory-limit') {
                 Events.fire('notify-user', Localization.getTranslation("notifications.ios-memory-limit"));
             }
             return;
         }
+        if (message.transferId && this._transferId && message.transferId !== this._transferId) return;
         Events.fire('file-transfer-accepted');
         Events.fire('set-progress', {peerId: this._peerId, progress: 0, status: 'transfer'});
         this.sendFiles();
@@ -1234,7 +1336,7 @@ class PeersManager {
 
 class FileChunker {
 
-    constructor(file, onChunk, onPartitionEnd) {
+    constructor(file, onChunk, onPartitionEnd, onError = () => {}) {
         this._chunkSize = 64000; // 64 KB
         this._maxPartitionSize = 1e6; // 1 MB
         this._offset = 0;
@@ -1242,8 +1344,11 @@ class FileChunker {
         this._file = file;
         this._onChunk = onChunk;
         this._onPartitionEnd = onPartitionEnd;
+        this._onError = onError;
         this._reader = new FileReader();
         this._reader.addEventListener('load', e => this._onChunkRead(e.target.result));
+        this._reader.addEventListener('error', e => this._onError(e));
+        this._reader.addEventListener('abort', e => this._onError(e));
     }
 
     nextPartition() {
@@ -1253,7 +1358,11 @@ class FileChunker {
 
     _readChunk() {
         const chunk = this._file.slice(this._offset, this._offset + this._chunkSize);
-        this._reader.readAsArrayBuffer(chunk);
+        try {
+            this._reader.readAsArrayBuffer(chunk);
+        } catch (e) {
+            this._onError(e);
+        }
     }
 
     _onChunkRead(chunk) {

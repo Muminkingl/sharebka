@@ -327,7 +327,9 @@ x-dialog x-background {
     transition: opacity 300ms;
     will-change: opacity;
     padding: 10px 5px 20px;
-    overflow: scroll
+    overflow: scroll;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 x-dialog x-paper {

@@ -446,8 +446,11 @@ function getUrlWithoutArguments() {
 }
 
 function changeFavicon(src) {
-    document.querySelector('[rel="icon"]').href = src;
-    document.querySelector('[rel="shortcut icon"]').href = src;
+    const href = new URL(src, window.location.href).toString();
+    const icon = document.querySelector('[rel="icon"]');
+    const shortcutIcon = document.querySelector('[rel="shortcut icon"]');
+    if (icon) icon.href = href;
+    if (shortcutIcon) shortcutIcon.href = href;
 }
 
 function arrayBufferToBase64(buffer) {
@@ -476,6 +479,7 @@ async function fileToBlob (file) {
 
 function getThumbnailAsDataUrl(file, width = undefined, height = undefined, quality = 0.7) {
     return new Promise(async (resolve, reject) => {
+        let imageUrl;
         try {
             if (file.type === "image/heif" || file.type === "image/heic") {
                 // hotfix: Converting heic images taken on iOS 18 crashes page. Waiting for PR #350
@@ -490,12 +494,22 @@ function getThumbnailAsDataUrl(file, width = undefined, height = undefined, qual
                 // });
             }
 
-            let imageUrl = URL.createObjectURL(file);
+            // Decoding very large camera originals just to render a small
+            // preview can exhaust iOS Safari's tab memory. The transfer itself
+            // remains available; callers simply use the generic file tile.
+            if (window.iOS && file.size > 50 * 1024 * 1024) {
+                reject(new Error('Image is too large to preview on iOS.'));
+                return;
+            }
+
+            imageUrl = URL.createObjectURL(file);
 
             let image = new Image();
-            image.src = imageUrl;
-
-            await waitUntilImageIsLoaded(imageUrl);
+            await new Promise((resolveImage, rejectImage) => {
+                image.onload = resolveImage;
+                image.onerror = rejectImage;
+                image.src = imageUrl;
+            });
 
             let imageWidth = image.width;
             let imageHeight = image.height;
@@ -527,6 +541,8 @@ function getThumbnailAsDataUrl(file, width = undefined, height = undefined, qual
         } catch (e) {
             console.error(e);
             reject(new Error(`Could not create an image thumbnail from type ${file.type}`));
+        } finally {
+            if (imageUrl) URL.revokeObjectURL(imageUrl);
         }
     })
 }

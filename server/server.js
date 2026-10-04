@@ -29,11 +29,37 @@ export default class PairDropServer {
             }
         }
 
+        if (conf.allowedOrigins.length) {
+            app.use((req, res, next) => {
+                // This signaling service intentionally exposes read-only GET
+                // endpoints. WebSocket upgrades are checked separately in
+                // PairDropWsServer.
+                if (req.method !== 'GET') {
+                    return res.status(405).json({error: 'method not allowed'});
+                }
+
+                const origin = typeof req.headers.origin === 'string'
+                    ? req.headers.origin.replace(/\/$/, '')
+                    : '';
+
+                if (!conf.allowedOrigins.includes(origin)) {
+                    return res.status(403).json({error: 'origin not allowed'});
+                }
+
+                res.setHeader('Access-Control-Allow-Origin', origin);
+                res.setHeader('Vary', 'Origin');
+                next();
+            });
+        }
+
         const __filename = fileURLToPath(import.meta.url);
         const __dirname = dirname(__filename);
 
         const publicPathAbs = path.join(__dirname, '../public');
-        app.use(express.static(publicPathAbs));
+        const backendOnly = process.env.BACKEND_ONLY === 'true';
+        if (!backendOnly) {
+            app.use(express.static(publicPathAbs));
+        }
 
         if (conf.debugMode && conf.rateLimit) {
             console.debug("\n");
@@ -54,13 +80,25 @@ export default class PairDropServer {
             });
         });
 
-        app.use((req, res) => {
-            res.redirect(301, '/');
-        });
+        if (backendOnly) {
+            app.get('/health', (req, res) => {
+                res.json({status: 'ok', service: 'pairdrop-signaling'});
+            });
+        }
+        else {
+            app.get('/', (req, res) => {
+                res.sendFile('index.html');
+                console.log(`Serving client files from:\n${publicPathAbs}`)
+            });
+        }
 
-        app.get('/', (req, res) => {
-            res.sendFile('index.html');
-            console.log(`Serving client files from:\n${publicPathAbs}`)
+        app.use((req, res) => {
+            if (backendOnly) {
+                res.status(404).json({error: 'not found'});
+            }
+            else {
+                res.redirect(301, '/');
+            }
         });
 
         const hostname = conf.localhostOnly ? '127.0.0.1' : null;

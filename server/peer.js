@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import {isIP} from "net";
 import parser from "ua-parser-js";
 import {animals, colors, uniqueNamesGenerator} from "unique-names-generator";
 import {cyrb53, hasher} from "./helper.js";
@@ -42,14 +43,25 @@ export default class Peer {
     }
 
     _setIP(request) {
-        if (request.headers['cf-connecting-ip']) {
-            this.ip = request.headers['cf-connecting-ip'].split(/\s*,\s*/)[0];
-        }
-        else if (request.headers['x-forwarded-for']) {
-            this.ip = request.headers['x-forwarded-for'].split(/\s*,\s*/)[0];
-        }
-        else {
-            this.ip = request.socket.remoteAddress ?? '';
+        const socketIp = request.socket.remoteAddress ?? '';
+        this.ip = socketIp;
+
+        // Forwarded headers are user controlled unless this process is behind
+        // a proxy that has been explicitly configured as trusted. Use only
+        // syntactically valid addresses and keep the socket address fallback.
+        if (this.conf.trustProxy) {
+            const forwarded = request.headers['x-forwarded-for'];
+            const cloudflare = request.headers['cf-connecting-ip'];
+            const candidates = [];
+            if (this.conf.trustCloudflareIp && cloudflare) candidates.push(cloudflare);
+            if (forwarded) candidates.push(forwarded);
+            for (const value of candidates) {
+                const candidate = String(value).split(/\s*,\s*/)[0].trim();
+                if (isIP(candidate)) {
+                    this.ip = candidate;
+                    break;
+                }
+            }
         }
 
         // remove the prefix used for IPv4-translated addresses

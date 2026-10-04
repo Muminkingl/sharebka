@@ -65,7 +65,10 @@ class Localization {
             Localization.$htmlRoot.setAttribute('dir', 'rtl');
         }
         else {
-            Localization.$htmlRoot.removeAttribute('dir');
+            // Explicitly reset direction after switching away from an RTL
+            // locale. Removing the attribute leaves the browser's inherited
+            // direction in place in embedded/PWA contexts.
+            Localization.$htmlRoot.setAttribute('dir', 'ltr');
         }
 
         Localization.$htmlRoot.setAttribute('lang', locale);

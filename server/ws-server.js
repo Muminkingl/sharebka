@@ -14,7 +14,22 @@ export default class PairDropWsServer {
         this._roomSecrets = {}; // { pairKey: roomSecret }
         this._keepAliveTimers = {};
 
-        this._wss = new WebSocketServer({ server });
+        const wsOptions = {server};
+        if (conf.allowedOrigins.length) {
+            wsOptions.verifyClient = (info, done) => {
+                const origin = typeof info.origin === 'string'
+                    ? info.origin.replace(/\/$/, '')
+                    : '';
+                if (conf.allowedOrigins.includes(origin)) {
+                    done(true);
+                }
+                else {
+                    done(false, 403, 'Origin not allowed');
+                }
+            };
+        }
+
+        this._wss = new WebSocketServer(wsOptions);
         this._wss.on('connection', (socket, request) => this._onConnection(new Peer(socket, request, conf)));
     }
 
@@ -48,6 +63,11 @@ export default class PairDropWsServer {
             message = JSON.parse(message);
         } catch (e) {
             console.warn("WS: Received JSON is malformed");
+            return;
+        }
+
+        if (!message || typeof message !== 'object' || Array.isArray(message) || typeof message.type !== 'string') {
+            console.warn("WS: Received an invalid message envelope");
             return;
         }
 
@@ -149,20 +169,19 @@ export default class PairDropWsServer {
     }
 
     _onRoomSecrets(sender, message) {
-        if (!message.roomSecrets) return;
+        if (!Array.isArray(message.roomSecrets)) return;
 
         const roomSecrets = message.roomSecrets.filter(roomSecret => {
             return /^[\x00-\x7F]{64,256}$/.test(roomSecret);
         })
 
-        if (!roomSecrets) return;
-
         this._joinSecretRooms(sender, roomSecrets);
     }
 
     _onRoomSecretsDeleted(sender, message) {
+        if (!Array.isArray(message.roomSecrets)) return;
         for (let i = 0; i<message.roomSecrets.length; i++) {
-            this._deleteSecretRoom(message.roomSecrets[i]);
+            if (typeof message.roomSecrets[i] === 'string') this._deleteSecretRoom(message.roomSecrets[i]);
         }
     }
 
@@ -205,7 +224,8 @@ export default class PairDropWsServer {
             return;
         }
 
-        if (!this._roomSecrets[message.pairKey] || sender.id === this._roomSecrets[message.pairKey].creator.id) {
+        if (typeof message.pairKey !== 'string' || !/^\d{6}$/.test(message.pairKey)
+            || !this._roomSecrets[message.pairKey] || sender.id === this._roomSecrets[message.pairKey].creator.id) {
             this._send(sender, { type: 'pair-device-join-key-invalid' });
             return;
         }
@@ -256,13 +276,21 @@ export default class PairDropWsServer {
             return;
         }
 
-        if (!this._rooms[message.publicRoomId] && !message.createIfInvalid) {
-            this._send(sender, { type: 'public-room-id-invalid', publicRoomId: message.publicRoomId });
+        const publicRoomId = typeof message.publicRoomId === 'string'
+            ? message.publicRoomId.trim().toLowerCase()
+            : '';
+        if (!/^[a-z]{5}$/.test(publicRoomId)) {
+            this._send(sender, { type: 'public-room-id-invalid', publicRoomId: publicRoomId });
+            return;
+        }
+
+        if (!this._rooms[publicRoomId] && message.createIfInvalid !== true) {
+            this._send(sender, { type: 'public-room-id-invalid', publicRoomId: publicRoomId });
             return;
         }
 
         this._leavePublicRoom(sender);
-        this._joinPublicRoom(sender, message.publicRoomId);
+        this._joinPublicRoom(sender, publicRoomId);
     }
 
     _onLeavePublicRoom(sender) {
@@ -272,6 +300,7 @@ export default class PairDropWsServer {
 
     _onRegenerateRoomSecret(sender, message) {
         const oldRoomSecret = message.roomSecret;
+        if (typeof oldRoomSecret !== 'string' || !this._rooms[oldRoomSecret]) return;
         const newRoomSecret = randomizer.getRandomString(256);
 
         // notify all other peers
@@ -445,6 +474,7 @@ export default class PairDropWsServer {
     _send(peer, message) {
         if (!peer) return;
         if (this._wss.readyState !== this._wss.OPEN) return;
+        if (!peer.socket || peer.socket.readyState !== peer.socket.OPEN) return;
         message = JSON.stringify(message);
         peer.socket.send(message);
     }

@@ -225,11 +225,17 @@ class PeersUI {
         if (this.shareMode.active || Dialog.anyDialogShown()) return;
 
         e.preventDefault()
-        let files = e.clipboardData.files;
+        let files = [...(e.clipboardData.files || [])];
+        // Safari and several mobile share surfaces expose pasted images only
+        // as clipboard items, leaving clipboardData.files empty.
+        if (!files.length && e.clipboardData.items) {
+            for (const item of e.clipboardData.items) {
+                if (item.kind !== 'file') continue;
+                const file = item.getAsFile();
+                if (file) files.push(file);
+            }
+        }
         let text = e.clipboardData.getData("Text");
-
-        // convert FileList to Array
-        files = [...files];
 
         if (files.length > 0) {
             Events.fire('activate-share-mode', {files: files});
@@ -710,6 +716,9 @@ class PeerUI {
 class Dialog {
     constructor(id) {
         this.$el = $(id);
+        this.$el.setAttribute('role', 'dialog');
+        this.$el.setAttribute('aria-modal', 'true');
+        this.$el.setAttribute('aria-hidden', 'true');
         this.$autoFocus = this.$el.querySelector('[autofocus]');
         this.$xBackground = this.$el.querySelector('x-background');
         this.$closeBtns = this.$el.querySelectorAll('[close]');
@@ -731,6 +740,7 @@ class Dialog {
         }
 
         this.$el.setAttribute('show', true);
+        this.$el.setAttribute('aria-hidden', 'false');
 
         if (!window.isMobile && this.$autoFocus) {
             this.$autoFocus.focus();
@@ -743,6 +753,7 @@ class Dialog {
 
     hide() {
         this.$el.removeAttribute('show');
+        this.$el.setAttribute('aria-hidden', 'true');
         if (!window.isMobile) {
             document.activeElement.blur();
             window.blur();
@@ -938,21 +949,30 @@ class ReceiveFileDialog extends ReceiveDialog {
                 if (Object.keys(previewElement).indexOf(mime) === -1) {
                     resolve(false);
                 }
+                else if (file.size > 100 * 1024 * 1024 && (mime === 'video' || mime === 'audio')) {
+                    // Avoid forcing mobile browsers to buffer very large
+                    // previews before the user has chosen a download action.
+                    resolve(false);
+                }
                 else {
                     let element = document.createElement(previewElement[mime]);
+                    const objectUrl = URL.createObjectURL(file);
                     element.controls = true;
                     element.onload = _ => {
+                        URL.revokeObjectURL(objectUrl);
                         this.$previewBox.appendChild(element);
                         resolve(true);
                     };
                     element.onloadeddata = _ => {
+                        URL.revokeObjectURL(objectUrl);
                         this.$previewBox.appendChild(element);
                         resolve(true);
                     };
                     element.onerror = _ => {
+                        URL.revokeObjectURL(objectUrl);
                         reject(`${mime} preview could not be loaded from type ${file.type}`);
                     };
-                    element.src = URL.createObjectURL(file);
+                    element.src = objectUrl;
                 }
             } catch (e) {
                 reject(`preview could not be loaded from type ${file.type}`);
@@ -976,7 +996,13 @@ class ReceiveFileDialog extends ReceiveDialog {
         }
         this.$receiveTitle.innerText = Localization.getTranslation("dialogs.receive-title", null, {descriptor: descriptor});
 
-        const canShare = (window.iOS || window.android) && !!navigator.share && navigator.canShare({files});
+        let canShare = false;
+        try {
+            canShare = (window.iOS || window.android) && !!navigator.share
+                && typeof navigator.canShare === 'function' && navigator.canShare({files});
+        } catch (_) {
+            canShare = false;
+        }
         if (canShare) {
             this.$shareBtn.removeAttribute('hidden');
             this.$shareBtn.onclick = _ => {
@@ -988,7 +1014,7 @@ class ReceiveFileDialog extends ReceiveDialog {
         }
 
         let downloadZipped = false;
-        if (files.length > 1) {
+        if (files.length > 1 && !canShare) {
             downloadZipped = true;
             try {
                 let bytesCompleted = 0;
@@ -1057,6 +1083,9 @@ class ReceiveFileDialog extends ReceiveDialog {
 
         setTimeout(() => {
             // wait for the dialog to be shown
+            // iOS rejects synthetic downloads outside a user gesture. Leave
+            // the button enabled so the user can start it explicitly.
+            if (window.iOS) return;
             if (canShare) {
                 this.$shareBtn.click();
             }
@@ -1077,12 +1106,15 @@ class ReceiveFileDialog extends ReceiveDialog {
             .catch(r => console.error(r));
     }
 
-    _downloadFilesIndividually(files) {
+    async _downloadFilesIndividually(files) {
         let tmpBtn = document.createElement("a");
         for (let i=0; i<files.length; i++) {
+            const objectUrl = URL.createObjectURL(files[i]);
             tmpBtn.download = files[i].name;
-            tmpBtn.href = URL.createObjectURL(files[i]);
+            tmpBtn.href = objectUrl;
             tmpBtn.click();
+            await new Promise(resolve => setTimeout(resolve, 150));
+            URL.revokeObjectURL(objectUrl);
         }
     }
 
@@ -1193,8 +1225,14 @@ class InputKeyContainer {
 
         this.$inputKeyContainer = inputKeyContainer;
         this.$inputKeyChars = inputKeyContainer.querySelectorAll('input');
+        this._composing = false;
 
         this.$inputKeyChars.forEach(char => char.addEventListener('input', e => this._onCharsInput(e)));
+        this.$inputKeyChars.forEach(char => char.addEventListener('compositionstart', _ => this._composing = true));
+        this.$inputKeyChars.forEach(char => char.addEventListener('compositionend', e => {
+            this._composing = false;
+            this._onCharsInput(e);
+        }));
         this.$inputKeyChars.forEach(char => char.addEventListener('keydown', e => this._onCharsKeyDown(e)));
         this.$inputKeyChars.forEach(char => char.addEventListener('keyup', e => this._onCharsKeyUp(e)));
         this.$inputKeyChars.forEach(char => char.addEventListener('focus', e => e.target.select()));
@@ -1225,6 +1263,7 @@ class InputKeyContainer {
     }
 
     _onCharsInput(e) {
+        if (this._composing) return;
         if (!e.target.value.match(this.evalRgx)) {
             e.target.value = '';
             return;
@@ -1825,8 +1864,9 @@ class PublicRoomDialog extends Dialog {
     }
 
     _joinPublicRoom(roomId, createIfInvalid = false) {
+        if (typeof roomId !== 'string') return;
         roomId = roomId.toLowerCase();
-        if (/^[a-z]{5}$/g.test(roomId)) {
+        if (/^[a-z]{5}$/.test(roomId)) {
             this.roomIdJoin = roomId;
 
             this.inputKeyContainer.focusLastChar();
@@ -1869,7 +1909,9 @@ class PublicRoomDialog extends Dialog {
         Events.fire('notify-user', Localization.getTranslation("notifications.public-room-id-invalid"));
         if (roomId === sessionStorage.getItem('public_room_id')) {
             sessionStorage.removeItem('public_room_id');
+            this._cleanUp();
         }
+        if (roomId === this.roomIdJoin) this.roomIdJoin = null;
     }
 
     _leavePublicRoom() {
@@ -1877,7 +1919,7 @@ class PublicRoomDialog extends Dialog {
     }
 
     _onPublicRoomLeft() {
-        let publicRoomId = this.roomId.toUpperCase();
+        let publicRoomId = (this.roomId || '').toUpperCase();
         this.hide();
         this._cleanUp();
         Events.fire('notify-user', Localization.getTranslation("notifications.public-room-left", null, {publicRoomId: publicRoomId}));
@@ -1895,6 +1937,7 @@ class PublicRoomDialog extends Dialog {
 
     _cleanUp() {
         this.roomId = null;
+        this.roomIdJoin = null;
         this.inputKeyContainer._cleanUp();
         sessionStorage.removeItem('public_room_id');
         this.$footerBadgePublicRoomDevices.setAttribute('hidden', true);
@@ -2484,6 +2527,22 @@ class Notifications {
         this.$headerNotificationButton = $('notification');
         this.$downloadBtn = $('download-btn');
 
+        if (navigator.serviceWorker) {
+            navigator.serviceWorker.addEventListener('message', e => {
+                if (!e.data || e.data.type !== 'notification-click') return;
+                const data = e.data.data || {};
+                if (data.action === 'open-link' && data.url) {
+                    window.open(data.url, '_blank', 'noreferrer');
+                }
+                else if (data.action === 'copy-text' && data.text) {
+                    this._copyText(data.text, {close: () => {}});
+                }
+                else if (data.action === 'download') {
+                    this.$downloadBtn.click();
+                }
+            });
+        }
+
         this.$headerNotificationButton.addEventListener('click', _ => this._requestPermission());
 
 
@@ -2493,29 +2552,36 @@ class Notifications {
     }
 
     async _requestPermission() {
-        await Notification.
-            requestPermission(permission => {
-                if (permission !== 'granted') {
-                    Events.fire('notify-user', Localization.getTranslation("notifications.notifications-permissions-error"));
-                    return;
-                }
-                Events.fire('notify-user', Localization.getTranslation("notifications.notifications-enabled"));
-                this.$headerNotificationButton.setAttribute('hidden', true);
-            });
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                Events.fire('notify-user', Localization.getTranslation("notifications.notifications-permissions-error"));
+                return;
+            }
+            Events.fire('notify-user', Localization.getTranslation("notifications.notifications-enabled"));
+            this.$headerNotificationButton.setAttribute('hidden', true);
+        } catch (_) {
+            Events.fire('notify-user', Localization.getTranslation("notifications.notifications-permissions-error"));
+        }
     }
 
-    _notify(title, body) {
+    _notify(title, body, data = {}) {
         const config = {
             body: body,
             icon: '/images/logo_transparent_128x128.png',
+            data: data,
         }
         let notification;
         try {
             notification = new Notification(title, config);
         } catch (e) {
             // Android doesn't support "new Notification" if service worker is installed
-            if (!serviceWorker || !serviceWorker.showNotification) return;
-            notification = serviceWorker.showNotification(title, config);
+            if (!('serviceWorker' in navigator)) return;
+            const registration = window.serviceWorker
+                ? Promise.resolve(window.serviceWorker)
+                : navigator.serviceWorker.ready;
+            notification = registration.then(serviceWorkerRegistration =>
+                serviceWorkerRegistration.showNotification(title, config));
         }
 
         // Notification is persistent on Android. We have to close it manually
@@ -2532,13 +2598,15 @@ class Notifications {
 
     _messageNotification(message, peerId) {
         if (document.visibilityState !== 'visible') {
-            const peerDisplayName = $(peerId).ui._displayName();
+            const peerNode = $(peerId);
+            if (!peerNode || !peerNode.ui) return;
+            const peerDisplayName = peerNode.ui._displayName();
             if (/^((https?:\/\/|www)[abcdefghijklmnopqrstuvwxyz0123456789\-._~:\/?#\[\]@!$&'()*+,;=]+)$/.test(message.toLowerCase())) {
-                const notification = this._notify(Localization.getTranslation("notifications.link-received", null, {name: peerDisplayName}), message);
+                const notification = this._notify(Localization.getTranslation("notifications.link-received", null, {name: peerDisplayName}), message, {action: 'open-link', url: message});
                 this._bind(notification, _ => window.open(message, '_blank', "noreferrer"));
             }
             else {
-                const notification = this._notify(Localization.getTranslation("notifications.message-received", null, {name: peerDisplayName}), message);
+                const notification = this._notify(Localization.getTranslation("notifications.message-received", null, {name: peerDisplayName}), message, {action: 'copy-text', text: message});
                 this._bind(notification, _ => this._copyText(message, notification));
             }
         }
@@ -2566,15 +2634,17 @@ class Notifications {
                 }
                 title = `${files[0].name} ${fileOther}`
             }
-            const notification = this._notify(title, Localization.getTranslation("notifications.click-to-download"));
+            const notification = this._notify(title, Localization.getTranslation("notifications.click-to-download"), {action: 'download'});
             this._bind(notification, _ => this._download(notification));
         }
     }
 
     _requestNotification(request, peerId) {
         if (document.visibilityState !== 'visible') {
+            const peerNode = $(peerId);
+            if (!peerNode || !peerNode.querySelector('.name')) return;
             let imagesOnly = request.header.every(header => header.mime.split('/')[0] === 'image');
-            let displayName = $(peerId).querySelector('.name').textContent;
+            let displayName = peerNode.querySelector('.name').textContent;
 
             let descriptor;
             if (request.header.length === 1) {
@@ -2595,34 +2665,30 @@ class Notifications {
                     descriptor: descriptor.toLowerCase()
                 });
 
-            const notification = this._notify(title, Localization.getTranslation("notifications.click-to-show"));
+            const notification = this._notify(title, Localization.getTranslation("notifications.click-to-show"), {action: 'show-request'});
         }
     }
 
     _download(notification) {
-        this.$downloadBtn.click();
-        notification.close();
+        if (this.$downloadBtn) this.$downloadBtn.click();
+        if (notification && notification.close) notification.close();
     }
 
     async _copyText(message, notification) {
-        if (await navigator.clipboard.writeText(message)) {
+        try {
+            await navigator.clipboard.writeText(message);
             notification.close();
             this._notify(Localization.getTranslation("notifications.copied-text"));
-        }
-        else {
+        } catch (_) {
             this._notify(Localization.getTranslation("notifications.copied-text-error"));
         }
     }
 
     _bind(notification, handler) {
         if (notification.then) {
-            notification.then(_ => {
-                serviceWorker
-                    .getNotifications()
-                    .then(_ => {
-                        serviceWorker.addEventListener('notificationclick', handler);
-                    })
-            });
+            // Service-worker notifications are handled by the worker's
+            // notificationclick event and routed back through postMessage.
+            notification.catch(error => console.error('Notification failed', error));
         }
         else {
             notification.onclick = handler;
@@ -2674,6 +2740,7 @@ class WebShareTargetUI {
         }
         else if (shareTargetType === "files") {
             let openRequest = window.indexedDB.open('pairdrop_store')
+            openRequest.onerror = _ => Events.fire('notify-user', Localization.getTranslation("notifications.file-content-incorrect"));
             openRequest.onsuccess = e => {
                 const db = e.target.result;
                 const tx = db.transaction('share_target_files', 'readwrite');
@@ -2684,7 +2751,9 @@ class WebShareTargetUI {
 
                     let filesReceived = [];
                     for (let i = 0; i < fileObjects.length; i++) {
-                        filesReceived.push(new File([fileObjects[i].buffer], fileObjects[i].name));
+                        filesReceived.push(new File([fileObjects[i].buffer], fileObjects[i].name, {
+                            type: fileObjects[i].type || 'application/octet-stream'
+                        }));
                     }
 
                     const clearRequest = store.clear()
@@ -2700,9 +2769,9 @@ class WebShareTargetUI {
 // Keep for legacy reasons even though this is removed from new PWA installations
 class WebFileHandlersUI {
     async evaluateLaunchQueue() {
-        if (!"launchQueue" in window) return;
+        if (!("launchQueue" in window)) return;
 
-        launchQueue.setConsumer(async launchParams => {
+        window.launchQueue.setConsumer(async launchParams => {
             console.log("Launched with: ", launchParams);
 
             if (!launchParams.files.length) return;

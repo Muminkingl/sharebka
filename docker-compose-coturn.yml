@@ -19,13 +19,12 @@ services:
   coturn_server:
     image: "coturn/coturn"
     restart: unless-stopped
+    # TURN allocates one UDP relay port per active allocation. Host networking
+    # avoids Docker creating thousands of individual port-forward rules for
+    # the relay range below (which can exhaust Docker's port manager).
+    # This profile targets Linux hosts such as Oracle Cloud instances.
+    network_mode: host
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf
       - ./ssl/:/etc/coturn/ssl/
-    ports:
-      - "3478:3478"
-      - "3478:3478/udp"
-      - "5349:5349"
-      - "5349:5349/udp"
-      - "10000-20000:10000-20000/udp"
     # see guide at docs/host-your-own.md#coturn-and-pairdrop-via-docker-compose

@@ -319,8 +319,14 @@ class FooterUI {
         return new Promise((resolve) => {
             PersistentStorage.get('edited_display_name')
                 .then(displayName => {
-                    if (!displayName) displayName = "";
-                    resolve(displayName);
+                    if (displayName) {
+                        resolve(displayName);
+                        return;
+                    }
+                    // Preserve names saved by older builds or in browsers
+                    // that fell back to localStorage before IndexedDB became
+                    // available.
+                    resolve(localStorage.getItem('edited_display_name') || "");
                 })
                 .catch(_ => {
                     let displayName = localStorage.getItem('edited_display_name');
@@ -367,6 +373,16 @@ class BackgroundCanvas {
         Events.on('resize', _ => init());
         Events.on('redraw-canvas', _ => init());
         Events.on('translation-loaded', _ => init());
+        Events.on('pageshow', _ => {
+            init();
+            switchAnimation(true);
+        });
+        Events.on(window.visibilityChangeEvent, _ => {
+            if (!window.hiddenProperty || !document[window.hiddenProperty]) {
+                init();
+                switchAnimation(true);
+            }
+        });
 
         // ShareMode
         Events.on('share-mode-changed', e => onShareModeChange(e.detail.active));

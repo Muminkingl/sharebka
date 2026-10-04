@@ -35,7 +35,8 @@ class PairDrop {
         this.initialize()
             .then(_ => {
                 console.log("Initialization completed.");
-            });
+            })
+            .catch(error => this.handleInitializationError(error));
     }
 
     async initialize() {
@@ -72,11 +73,15 @@ class PairDrop {
     registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
-                .register('service-worker.js')
+                .register('/service-worker.js', {updateViaCache: 'none'})
                 .then(serviceWorker => {
                     console.log('Service Worker registered');
-                    window.serviceWorker = serviceWorker
-                });
+                    window.serviceWorker = serviceWorker;
+                    // Check for a fresh worker on every app boot. This avoids
+                    // serving an old shell after a frontend deployment.
+                    return serviceWorker.update();
+                })
+                .catch(error => console.error('Service Worker registration failed', error));
         }
     }
 
@@ -130,13 +135,14 @@ class PairDrop {
     }
 
     loadAndApplyStylesheet(url) {
-        return new Promise( async (resolve) => {
+        return new Promise( async (resolve, reject) => {
             try {
                 await this.loadStyleSheet(url);
                 console.log(`Stylesheet loaded successfully: ${url}`);
                 resolve();
             } catch (error) {
                 console.error('Error loading stylesheet:', error);
+                reject(error);
             }
         });
     }
@@ -153,15 +159,47 @@ class PairDrop {
     }
 
     loadAndApplyScript(url) {
-        return new Promise( async (resolve) => {
+        return new Promise( async (resolve, reject) => {
             try {
                 await this.loadScript(url);
                 console.log(`Script loaded successfully: ${url}`);
                 resolve();
             } catch (error) {
                 console.error('Error loading script:', error);
+                reject(error);
             }
         });
+    }
+
+    handleInitializationError(error) {
+        console.error('PairDrop initialization failed', error);
+        document.querySelectorAll('.opacity-0').forEach(element => element.classList.remove('opacity-0'));
+
+        const notice = document.createElement('div');
+        notice.setAttribute('role', 'alert');
+        notice.style.cssText = 'position:fixed;inset:1rem auto auto 1rem;right:1rem;z-index:10000;padding:1rem;border-radius:8px;background:#b3261e;color:#fff;font:16px sans-serif;';
+        notice.textContent = 'PairDrop could not finish loading. Reload to try again.';
+
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.textContent = 'Reload';
+        retry.style.cssText = 'margin-left:1rem;padding:.4rem .8rem;';
+        retry.addEventListener('click', async () => {
+            try {
+                if (window.caches) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
+                }
+                if (navigator.serviceWorker) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(registration => registration.unregister()));
+                }
+            } finally {
+                location.reload();
+            }
+        });
+        notice.appendChild(retry);
+        document.body.appendChild(notice);
     }
 
     async hydrate() {
